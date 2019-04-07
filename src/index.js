@@ -2,11 +2,11 @@ module.exports = merge;
 
 const { parse } = require('graphql');
 
-function merge({ schemas, parseOptions, onTypeConflict }) {
-    schemas = schemas.map(prepareSchema);
+function merge({ typeDefs, parseOptions, onTypeConflict }) {
+    typeDefs = typeDefs.map(prepareSchema);
     return {
         kind: 'Document',
-        definitions: mergeAll(schemas)
+        definitions: mergeAll(typeDefs)
     };
 
     function mergeAll(definitions) {
@@ -45,8 +45,22 @@ function merge({ schemas, parseOptions, onTypeConflict }) {
             return result;
 
             function processField(key) {
-                if (!result[key] && Array.isArray(definition1[key]) && Array.isArray(definition2[key])) {
-                    result[key] = nameMerge(definition1[key], definition2[key]);
+                if (!result[key]) {
+                    return;
+                }
+                if (!Array.isArray(definition1[key]) || !Array.isArray(definition1[key]).every(isNamedType)) {
+                    return;
+                }
+                if (!Array.isArray(definition2[key]) || !Array.isArray(definition2[key]).every(isNamedType)) {
+                    return;
+                }
+                result[key] = nameMerge(definition1[key], definition2[key]);
+
+                function isNamedType(node) {
+                    return node &&
+                        typeof node.name === 'object' &&
+                        node.name.kind === 'Name' &&
+                        typeof node.name.value === 'string';
                 }
             }
         }
@@ -61,14 +75,14 @@ function merge({ schemas, parseOptions, onTypeConflict }) {
         return -1;
     }
 
-    function prepareSchema(schema) {
-        if (typeof schema === 'string') {
-            schema = parse(schema, parseOptions);
+    function prepareSchema(typeDefs) {
+        if (typeof typeDefs === 'string') {
+            typeDefs = parse(typeDefs, parseOptions);
         }
-        if (!schema || schema.kind !== 'Document') {
-            throw new Error('Supplied schemas MUST be or MUST parse to Document');
+        if (!typeDefs || typeDefs.kind !== 'Document') {
+            throw new Error('Supplied typeDefs MUST be or MUST parse to Document');
         }
-        return schema.definitions;
+        return typeDefs.definitions;
     }
 }
 
